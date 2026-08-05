@@ -17,21 +17,21 @@ class GeometryAwarePairEncoder(nn.Module):
     def forward(self, acoustic_features, geometry_features):
         """
         Args:
-            acoustic_features: (B, P, 5, K, T)
-            geometry_features: (B, P, 8)
+            acoustic_features: (B, 2P, 5, K, T) - 방향이 양쪽으로 확장된 feature 입력
+            geometry_features: (B, 2P, 8)
 
         Returns:
-            pair_embedding: (B, P, hidden_dim, K, T)
+            pair_embedding: (B, 2P, hidden_dim, K, T)
         """
         B, P, C, K, T = acoustic_features.shape
-        geometry = geometry_features[..., None, None]  # (B, P, 8, 1, 1)
-        geometry = geometry.expand(B, P, 8, K, T)  # (B, P, 8, K, T)
+        geometry = geometry_features[..., None, None]  # (B, 2P, 8, 1, 1)
+        geometry = geometry.expand(B, P, 8, K, T)  # (B, 2P, 8, K, T)
 
         frequency = torch.arange(K, device=acoustic_features.device, dtype=acoustic_features.dtype)/K  # 0, ..., K-1/K
         frequency = frequency.view(1, 1, 1, K, 1)    # (1, 1, 1, K, 1)
-        frequency = frequency.expand(B, P, 1, K, T)  # (B, P, 1, K, T)
+        frequency = frequency.expand(B, P, 1, K, T)  # (B, 2P, 1, K, T)
 
-        pair_input_features = torch.cat([acoustic_features, geometry, frequency], dim=2)  # (B, P, 14, K, T)
+        pair_input_features = torch.cat([acoustic_features, geometry, frequency], dim=2)  # (B, 2P, 14, K, T)
         pair_input_features = pair_input_features.reshape(B*P, 14, K, T)
 
         # Linear projection
