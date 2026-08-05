@@ -14,35 +14,34 @@ class GeometryAwarePairEncoder(nn.Module):
         self.temporal_block = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=(1,3), padding=(0,1))
         self.activation = nn.GELU()
 
-    def forward(self, pair_features, pair_geometry):
+    def forward(self, acoustic_features, geometry_features):
         """
         Args:
-            pair_features: (B, P, 5, K, T)
-            pair_geometry: (B, P, 8)
+            acoustic_features: (B, P, 5, K, T)
+            geometry_features: (B, P, 8)
 
         Returns:
             pair_embedding: (B, P, hidden_dim, K, T)
         """
-        B, P, C, K, T = pair_features.shape
-        geometry = pair_geometry[..., None, None]  # (B, P, 8, 1, 1)
+        B, P, C, K, T = acoustic_features.shape
+        geometry = geometry_features[..., None, None]  # (B, P, 8, 1, 1)
         geometry = geometry.expand(B, P, 8, K, T)  # (B, P, 8, K, T)
 
-        frequency = torch.arange(K, device=pair_features.device, dtype=pair_features.dtype)/K  # 0, ..., K-1/K
+        frequency = torch.arange(K, device=acoustic_features.device, dtype=acoustic_features.dtype)/K  # 0, ..., K-1/K
         frequency = frequency.view(1, 1, 1, K, 1)    # (1, 1, 1, K, 1)
         frequency = frequency.expand(B, P, 1, K, T)  # (B, P, 1, K, T)
 
-        # acoustic features
-        x = torch.cat([pair_features, geometry, frequency], dim=2)  # (B, P, 14, K, T)
-        x = x.reshape(B*P, 14, K, T)
+        pair_input_features = torch.cat([acoustic_features, geometry, frequency], dim=2)  # (B, P, 14, K, T)
+        pair_input_features = pair_input_features.reshape(B*P, 14, K, T)
 
         # Linear projection
-        x = self.activation(self.linear_projection(x))
+        pair_embedding = self.activation(self.linear_projection(pair_input_features))
 
         # Frequency block
-        x = self.activation(self.frequency_block(x))
+        pair_embedding = self.activation(self.frequency_block(pair_embedding))
 
         # Temporal block
-        x = self.activation(self.temporal_block(x))
+        pair_embedding = self.activation(self.temporal_block(pair_embedding))
 
-        return x.reshape(B, P, -1, K, T)
+        return pair_embedding.reshape(B, P, -1, K, T)
 
